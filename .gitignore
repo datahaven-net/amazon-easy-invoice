@@ -1,0 +1,12 @@
+### Config Files ###
+config.py
+
+### VirtualEnv ###
+venv
+
+### Directory-created by project ###
+Downloads
+
+### Python ###
+__pycache__
+.idea/

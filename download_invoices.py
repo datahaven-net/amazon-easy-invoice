@@ -67,6 +67,8 @@ def download_invoices_with_tracking_ids_as_pdf():
             ).encode('utf-8')
             f.write(page_content_encoded)
 
+    browser.quit()
+
 
 if __name__ == '__main__':
     download_invoices_with_tracking_ids_as_pdf()

@@ -32,16 +32,16 @@ def download_invoices_with_tracking_ids_as_pdf():
 
     browser.get(config.AMAZON_ORDERS_URL)
     time.sleep(5)
-    tracking_urls_length = len(browser.find_elements_by_xpath("//a[contains(@href, 'progress-tracker')]"))
+    order_urls_length = len(browser.find_elements_by_xpath("//a[contains(@href, 'progress-tracker')]"))
 
-    if not tracking_urls_length:
+    if not order_urls_length:
         browser.quit()
 
-    tracking_numbers = []
+    orders = []
 
-    for i in range(tracking_urls_length):
-        tracking_url = browser.find_elements_by_xpath("//a[contains(@href, 'progress-tracker')]")[i]
-        tracking_url.click()
+    for i in range(order_urls_length):
+        order_url = browser.find_elements_by_xpath("//a[contains(@href, 'progress-tracker')]")[i]
+        order_url.click()
         time.sleep(5)
         current_url = browser.current_url
         parsed = urlparse.urlparse(current_url)
@@ -52,7 +52,12 @@ def download_invoices_with_tracking_ids_as_pdf():
         except Exception:
             tracking_id = ""
 
-        tracking_numbers.append({order_id: tracking_id})
+        try:
+            delivery_by = browser.find_elements_by_xpath("//*[contains(text(), 'Delivery By')]")[0].text
+        except Exception:
+            delivery_by = ""
+
+        orders.append({order_id: {"tracking_id": tracking_id, "delivery_by": delivery_by}})
 
         browser.back()
         browser.implicitly_wait(5)
@@ -63,17 +68,19 @@ def download_invoices_with_tracking_ids_as_pdf():
     if not os.path.exists(download_folder):
         os.mkdir(f'{here}/Downloads')
 
-    for i in range(tracking_urls_length):
-        order_id = list(tracking_numbers[i].keys())[0]
-        tracking_id = list(tracking_numbers[i].values())[0]
+    for i in range(order_urls_length):
+        order_id = list(orders[i].keys())[0]
+        tracking_id = orders[i][order_id]["tracking_id"]
+        delivery_by = orders[i][order_id]["delivery_by"]
         html_file = f'{here}/Downloads/invoice_{order_id}.html'
+
         browser.get(config.AMAZON_ORDER_INVOICE_URL + order_id)
 
         with open(html_file, 'wb') as f:
             page_content = browser.page_source
             page_content_encoded = page_content.replace(
                 re.findall(
-                    f'{order_id}', page_content)[0], f"{order_id} Tracking ID: {tracking_id}"
+                    f'{order_id}', page_content)[0], f"{order_id} Tracking ID: {tracking_id} {delivery_by}",
             ).encode('utf-8')
             f.write(page_content_encoded)
 

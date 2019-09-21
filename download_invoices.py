@@ -12,44 +12,54 @@ browser = webdriver.Chrome()
 
 def login():
     browser.get(config.AMAZON_LOGIN_URL)
-    time.sleep(2)
+    time.sleep(5)
 
     # Fill username
     email = browser.find_element_by_name("email")
     email.send_keys(config.AMAZON_USER_EMAIL)
     email.submit()
-    time.sleep(2)
+    time.sleep(5)
 
     # Fill password
     password = browser.find_element_by_name("password")
     password.send_keys(config.AMAZON_USER_PASSWORD)
     password.submit()
-    time.sleep(15)
+    time.sleep(45)
 
 
 def download_invoices_with_tracking_ids_as_pdf():
     login()
 
     browser.get(config.AMAZON_ORDERS_URL)
-    time.sleep(2)
+    time.sleep(5)
     tracking_urls_length = len(browser.find_elements_by_xpath("//a[contains(@href, 'progress-tracker')]"))
+
+    if not tracking_urls_length:
+        browser.quit()
 
     tracking_numbers = []
 
     for i in range(tracking_urls_length):
         tracking_url = browser.find_elements_by_xpath("//a[contains(@href, 'progress-tracker')]")[i]
         tracking_url.click()
-        time.sleep(2)
+        time.sleep(5)
         current_url = browser.current_url
         parsed = urlparse.urlparse(current_url)
         order_id = urlparse.parse_qs(parsed.query)["orderId"][0]
-        tracking_id = browser.find_element_by_partial_link_text("Tracking").text.split(" ")[-1]
+
+        try:
+            tracking_id = browser.find_element_by_partial_link_text("Tracking").text.split(" ")[-1]
+        except Exception:
+            tracking_id = ""
+
         tracking_numbers.append({order_id: tracking_id})
+
         browser.back()
-        browser.implicitly_wait(2)
+        browser.implicitly_wait(5)
 
     here = os.path.dirname(os.path.abspath(__file__))
     download_folder = f'{here}/Downloads'
+
     if not os.path.exists(download_folder):
         os.mkdir(f'{here}/Downloads')
 

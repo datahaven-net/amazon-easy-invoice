@@ -53,9 +53,17 @@ def download_invoices_with_tracking_ids_as_pdf():
             tracking_id = ""
 
         try:
-            delivery_by = browser.find_elements_by_xpath("//*[contains(text(), 'Delivery By')]")[0].text
+            # Amazon.com shows delivery company with "Shipped with" sentence.
+            delivery_by = browser.find_elements_by_xpath("//*[contains(text(), 'Shipped with')]")[0].text
         except Exception:
             delivery_by = ""
+
+        if not delivery_by:
+            try:
+                # Some other amazon websites like amazon.de shows delivery company with "Delivery By" sentence.
+                delivery_by = browser.find_elements_by_xpath("//*[contains(text(), 'Delivery By')]")[0].text
+            except Exception:
+                delivery_by = ""
 
         orders.append({order_id: {"tracking_id": tracking_id, "delivery_by": delivery_by}})
 

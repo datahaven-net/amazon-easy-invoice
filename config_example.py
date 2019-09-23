@@ -3,3 +3,6 @@ AMAZON_ORDERS_URL = "https://www.amazon.com/orders"
 AMAZON_ORDER_INVOICE_URL = "https://www.amazon.com/gp/css/summary/print.html/?orderID="
 AMAZON_USER_EMAIL = "test@example.com"
 AMAZON_USER_PASSWORD = "test"
+
+WAITING_TIME_AFTER_LOGIN = 60
+WAITING_TIME_BETWEEN_PAGES = 5

@@ -6,29 +6,33 @@ Amazon invoice downloader as HTML with tracking id which belongs to that invoice
 ## Installation
 
 Clone project files locally.
-Create a virtual environment. Note that, this project only supports Python3.6 and above.
 
-        $ virtualenv -p python3 venv
+Execute install.sh script to create virtual environment and install needed packages.
 
-Activate your virtual environment.
-
-        $ source venv/bin/activate
-
-Install the requirements.
-
-        $ pip install -r requirements.txt
+        $ ./install.sh
         
 Download ChromeDriver. Note that, chromedriver version should be compatible with your Google Chrome in your local machine.
 
     https://chromedriver.chromium.org/downloads
 
-Copy config_example.py as config.py and update your username and password (and if needed update urls).
+Copy config_example.py as config.py and update your username, password and waiting times between pages (and if needed update urls).
 
 
 ## Download invoices
-Run the script
+Execute the invoices.sh script
 
-    $ python download_invoices.py
+    $ ./invoices.sh
+
+If you want to download specific amount of orders, you can give amount of invoices as below.
+
+    $ ./invoices.sh 5
 
 Script will create Downloads folder in the project. 
-You can open html files which were downloaded in this folder. 
+You can open html files which were downloaded in this folder.
+
+
+## Troubleshooting
+
+#### WebDriverException: Message: 'chromedriver' executable needs to be available in the path.
+
+    $ export PATH="$PATH:/projects_folder"

@@ -91,6 +91,7 @@ def get_all_orders_with_tracking_info(amount_of_invoices):
     time.sleep(config.WAITING_TIME_BETWEEN_PAGES)
 
     order_urls_length = len(browser.find_elements_by_xpath("//a[contains(@href, 'progress-tracker')]"))
+    print(f'Total track packages amount is {order_urls_length}')
 
     if not order_urls_length:
         browser.quit()
@@ -100,11 +101,12 @@ def get_all_orders_with_tracking_info(amount_of_invoices):
         total_invoices_to_download = amount_of_invoices
     else:
         total_invoices_to_download = order_urls_length
-
+    print(f'Total amount invoices to download is {total_invoices_to_download}')
     orders = []
 
     for i in range(total_invoices_to_download):
         # Click progress tracker of the order and go to that page.
+        print(f'Going to click track package link number {i+1}')
         progress_tracker = browser.find_elements_by_xpath("//a[contains(@href, 'progress-tracker')]")[i]
         progress_tracker.click()
         time.sleep(config.WAITING_TIME_BETWEEN_PAGES)

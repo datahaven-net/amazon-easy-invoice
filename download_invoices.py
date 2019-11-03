@@ -1,29 +1,36 @@
 import argparse
 import os
 import re
-import time
 from urllib import parse as urlparse
 
 from selenium import webdriver
+from selenium.common.exceptions import TimeoutException
+from selenium.webdriver.support.wait import WebDriverWait
 
 import config
 
 
 def login():
     browser.get(config.AMAZON_LOGIN_URL)
-    time.sleep(config.WAITING_TIME_BETWEEN_PAGES)
 
     # Fill username
-    email = browser.find_element_by_name("email")
+    try:
+        email = browser.find_element_by_name("email")
+        WebDriverWait(browser, config.WAITING_TIME_BETWEEN_PAGES)
+    except TimeoutException:
+        raise Exception("Email filling page could not be loaded.")
+
     email.send_keys(config.AMAZON_USER_EMAIL)
     email.submit()
-    time.sleep(config.WAITING_TIME_BETWEEN_PAGES)
 
     # Fill password
-    password = browser.find_element_by_name("password")
+    try:
+        password = browser.find_element_by_name("password")
+        WebDriverWait(browser, config.WAITING_TIME_BETWEEN_PAGES)
+    except TimeoutException:
+        raise Exception("Password page could not be loaded.")
     password.send_keys(config.AMAZON_USER_PASSWORD)
     password.submit()
-    time.sleep(config.WAITING_TIME_AFTER_LOGIN)
 
 
 def get_tracking_id():
@@ -70,30 +77,52 @@ def get_ordered_item_names():
     for i in range(length_of_items):
         item_url = browser.find_elements_by_xpath("//a[contains(@href, 'gp/product')]")[i]
         item_url.click()
-        time.sleep(config.WAITING_TIME_BETWEEN_PAGES)
+        try:
+            wait = WebDriverWait(browser, config.WAITING_TIME_BETWEEN_PAGES)
+            wait.until(lambda driver: "gp/product" in browser.current_url)
+        except TimeoutException:
+            raise Exception(f"Product page could not be loaded.")
+
         item_names.append(browser.title)
         browser.back()
-        time.sleep(config.WAITING_TIME_BETWEEN_PAGES)
+
+        try:
+            wait = WebDriverWait(browser, config.WAITING_TIME_BETWEEN_PAGES)
+            wait.until(lambda driver: "progress-tracker" in browser.current_url)
+        except TimeoutException:
+            raise Exception(f"Progress tracker for order number {i+1} could not be loaded.")
 
     return item_names
 
 
 def get_all_orders_with_tracking_info(amount_of_invoices):
     """
-
-    :param amount_of_invoices: Amount of the invoices to gather the info
+    :param amount_of_invoices: Amount of the invoices to gather the info about
     :return: orders: all orders as list of order ids which have the list of tracking information with tracking_id,
     name of the delivery company and ordered items which belong to that specific tracking_id.
     """
-    login()
+
+    try:
+        order_urls = browser.find_elements_by_xpath("//a[contains(@href, 'order')]")
+        WebDriverWait(order_urls, config.WAITING_TIME_AFTER_LOGIN)
+    except TimeoutException:
+        raise Exception("Login was not successful within timeout seconds.")
 
     browser.get(config.AMAZON_ORDERS_URL)
-    time.sleep(config.WAITING_TIME_BETWEEN_PAGES)
+
+    try:
+        wait = WebDriverWait(browser, config.WAITING_TIME_BETWEEN_PAGES)
+        wait.until(lambda driver: "order-history" in browser.current_url)
+    except TimeoutException:
+        raise Exception(f"Order page could not be loaded.")
 
     order_urls_length = len(browser.find_elements_by_xpath("//a[contains(@href, 'progress-tracker')]"))
+    WebDriverWait(order_urls_length, config.WAITING_TIME_BETWEEN_PAGES)
+
     print(f'Total track packages amount is {order_urls_length}')
 
     if not order_urls_length:
+        print('You do not have any order at this moment.')
         browser.quit()
 
     # Check if the given input to download invoices is equal or less than total orders. If not, download all orders.
@@ -109,7 +138,12 @@ def get_all_orders_with_tracking_info(amount_of_invoices):
         print(f'Going to click track package link number {i+1}')
         progress_tracker = browser.find_elements_by_xpath("//a[contains(@href, 'progress-tracker')]")[i]
         progress_tracker.click()
-        time.sleep(config.WAITING_TIME_BETWEEN_PAGES)
+
+        try:
+            wait = WebDriverWait(browser, config.WAITING_TIME_BETWEEN_PAGES)
+            wait.until(lambda driver: "progress-tracker" in browser.current_url)
+        except TimeoutException:
+            raise Exception(f"Progress tracker for order number {i+1} could not be loaded.")
 
         # Get the order id from the URL of the progress tracker
         current_url = browser.current_url
@@ -135,8 +169,11 @@ def get_all_orders_with_tracking_info(amount_of_invoices):
 
         # Go back orders page to continue with clicking progress tracker pages.
         browser.get(config.AMAZON_ORDERS_URL)
-        browser.implicitly_wait(config.WAITING_TIME_BETWEEN_PAGES)
-
+        try:
+            wait = WebDriverWait(browser, config.WAITING_TIME_BETWEEN_PAGES)
+            wait.until(lambda driver: "order-history" in browser.current_url)
+        except TimeoutException:
+            raise Exception(f"Order page could not be loaded.")
     return orders
 
 
@@ -186,5 +223,5 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     browser = webdriver.Chrome()
-
+    login()
     download_invoices_with_tracking_ids_as_pdf(args.invoices_amount)

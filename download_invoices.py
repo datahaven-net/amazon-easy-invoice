@@ -1,6 +1,7 @@
 import argparse
 import os
 import re
+import time
 from urllib import parse as urlparse
 
 from selenium import webdriver
@@ -40,6 +41,7 @@ class AmazonEasyInvoice(object):
             raise Exception("Password page could not be loaded.")
         password.send_keys(config.AMAZON_USER_PASSWORD)
         password.submit()
+        time.sleep(config.WAITING_TIME_AFTER_LOGIN)
 
     def get_tracking_id(self):
         """
@@ -106,12 +108,6 @@ class AmazonEasyInvoice(object):
         :return: orders: all orders as list of order ids which have the list of tracking information with tracking_id,
         name of the delivery company and ordered items which belong to that specific tracking_id.
         """
-
-        try:
-            order_urls = self.browser.find_elements_by_xpath("//a[contains(@href, 'order')]")
-            WebDriverWait(order_urls, config.WAITING_TIME_AFTER_LOGIN)
-        except TimeoutException:
-            raise Exception("Login was not successful within timeout seconds.")
 
         self.browser.get(config.AMAZON_ORDERS_URL)
 

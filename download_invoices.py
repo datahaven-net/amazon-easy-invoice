@@ -118,6 +118,11 @@ class AmazonEasyInvoice(object):
             raise Exception(f"Order page could not be loaded.")
 
         order_urls = self.browser.find_elements_by_xpath("//a[contains(@href, 'progress-tracker')]")
+
+        progress_tracker_urls = []
+        for order_url in order_urls:
+            progress_tracker_urls.append(order_url.get_attribute("href"))
+
         order_urls_length = len(order_urls)
         WebDriverWait(order_urls, config.WAITING_TIME_BETWEEN_PAGES)
 
@@ -138,8 +143,7 @@ class AmazonEasyInvoice(object):
         for i in range(total_invoices_to_download):
             # Go to the progress tracker of the order.
             print(f'Going to click track package link number {i+1}')
-            progress_tracker_url = order_urls[i].get_attribute("href")
-            self.browser.get(progress_tracker_url)
+            self.browser.get(progress_tracker_urls[i])
 
             try:
                 wait = WebDriverWait(self.browser, config.WAITING_TIME_BETWEEN_PAGES)

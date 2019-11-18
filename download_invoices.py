@@ -117,14 +117,15 @@ class AmazonEasyInvoice(object):
         except TimeoutException:
             raise Exception(f"Order page could not be loaded.")
 
-        order_urls_length = len(self.browser.find_elements_by_xpath("//a[contains(@href, 'progress-tracker')]"))
-        WebDriverWait(order_urls_length, config.WAITING_TIME_BETWEEN_PAGES)
-
-        print(f'Total track packages amount is {order_urls_length}')
+        order_urls = self.browser.find_elements_by_xpath("//a[contains(@href, 'progress-tracker')]")
+        order_urls_length = len(order_urls)
+        WebDriverWait(order_urls, config.WAITING_TIME_BETWEEN_PAGES)
 
         if not order_urls_length:
             print('You do not have any order at this moment.')
             self.browser.quit()
+
+        print(f'Total track packages amount is {order_urls_length}')
 
         # Check if the given input to download invoices is equal or less than total orders. If not, download all orders.
         if 0 < amount_of_invoices <= order_urls_length:
@@ -135,10 +136,10 @@ class AmazonEasyInvoice(object):
         orders = []
 
         for i in range(total_invoices_to_download):
-            # Click progress tracker of the order and go to that page.
+            # Go to the progress tracker of the order.
             print(f'Going to click track package link number {i+1}')
-            progress_tracker = self.browser.find_elements_by_xpath("//a[contains(@href, 'progress-tracker')]")[i]
-            progress_tracker.click()
+            progress_tracker_url = order_urls[i].get_attribute("href")
+            self.browser.get(progress_tracker_url)
 
             try:
                 wait = WebDriverWait(self.browser, config.WAITING_TIME_BETWEEN_PAGES)
@@ -169,13 +170,6 @@ class AmazonEasyInvoice(object):
             else:
                 orders.append({order_id: [tracked_item]})
 
-            # Go back orders page to continue with clicking progress tracker pages.
-            self.browser.get(config.AMAZON_ORDERS_URL)
-            try:
-                wait = WebDriverWait(self.browser, config.WAITING_TIME_BETWEEN_PAGES)
-                wait.until(lambda driver: "order-history" in self.browser.current_url)
-            except TimeoutException:
-                raise Exception(f"Order page could not be loaded.")
         return orders
 
     def download_invoices_with_tracking_ids_as_pdf(self, amount_of_invoices):

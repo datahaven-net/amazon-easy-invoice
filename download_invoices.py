@@ -1,11 +1,12 @@
 import argparse
 import os
 import re
-import time
 from urllib import parse as urlparse
 
 from selenium import webdriver
 from selenium.common.exceptions import TimeoutException
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 
 import config
@@ -40,18 +41,40 @@ class AmazonEasyInvoice(object):
         except TimeoutException:
             raise Exception("Password page could not be loaded.")
         password.send_keys(config.AMAZON_USER_PASSWORD)
+
+        # Click "remember me" check box.
+        self.browser.find_element_by_xpath(
+            ".//*[contains(text(), 'Keep me signed in')]"
+        ).click()
+
         password.submit()
-        time.sleep(config.WAITING_TIME_AFTER_LOGIN)
+
+        try:
+            WebDriverWait(self.browser, config.WAITING_TIME_AFTER_LOGIN).until(
+                EC.presence_of_element_located(
+                    (By.XPATH, "//a[contains(@href, 'order-history')]")
+                )
+            )
+        except TimeoutException:
+            print(f'You could not login in {config.WAITING_TIME_AFTER_LOGIN} seconds')
+            self.browser.quit()
 
     def get_tracking_id(self):
         """
 
         :return: tracking_id
         """
+
         try:
             tracking_id = self.browser.find_element_by_partial_link_text("Tracking").text.split(" ")[-1]
         except Exception:
             tracking_id = ""
+
+        if not tracking_id:
+            try:
+                tracking_id = self.browser.find_elements_by_xpath("//*[contains(text(), 'Tracking ID')]")[0].text.split()[-1]
+            except Exception:
+                tracking_id = ""
 
         return tracking_id
 
@@ -60,6 +83,7 @@ class AmazonEasyInvoice(object):
 
         :return: delivery_by: name of the delivery company
         """
+
         try:
             # Amazon.com shows delivery company with "Shipped with" sentence.
             delivery_by = self.browser.find_elements_by_xpath("//*[contains(text(), 'Shipped with')]")[0].text
@@ -74,6 +98,16 @@ class AmazonEasyInvoice(object):
                 delivery_by = ""
 
         return delivery_by
+
+    def wait_progress_tracker_page_to_be_loaded(self):
+        try:
+            WebDriverWait(self.browser, config.WAITING_TIME_BETWEEN_PAGES).until(
+                EC.presence_of_element_located(
+                    (By.PARTIAL_LINK_TEXT, "Tracking ID")
+                )
+            )
+        except TimeoutException:
+            pass
 
     def get_ordered_item_names(self):
         """
@@ -93,12 +127,7 @@ class AmazonEasyInvoice(object):
 
             item_names.append(self.browser.title)
             self.browser.back()
-
-            try:
-                wait = WebDriverWait(self.browser, config.WAITING_TIME_BETWEEN_PAGES)
-                wait.until(lambda driver: "progress-tracker" in self.browser.current_url)
-            except TimeoutException:
-                raise Exception(f"Progress tracker for order number {i+1} could not be loaded.")
+            self.wait_progress_tracker_page_to_be_loaded()
 
         return item_names
 
@@ -144,12 +173,7 @@ class AmazonEasyInvoice(object):
             # Go to the progress tracker of the order.
             print(f'Going to click track package link number {i+1}')
             self.browser.get(progress_tracker_urls[i])
-
-            try:
-                wait = WebDriverWait(self.browser, config.WAITING_TIME_BETWEEN_PAGES)
-                wait.until(lambda driver: "progress-tracker" in self.browser.current_url)
-            except TimeoutException:
-                raise Exception(f"Progress tracker for order number {i+1} could not be loaded.")
+            self.wait_progress_tracker_page_to_be_loaded()
 
             # Get the order id from the URL of the progress tracker
             current_url = self.browser.current_url
@@ -160,7 +184,7 @@ class AmazonEasyInvoice(object):
             tracked_item = {
                 "tracking_id": self.get_tracking_id(),
                 "delivery_by": self.get_delivery_company(),
-                "item_names": self.get_ordered_item_names()
+                "item_names": self.get_ordered_item_names(),
             }
 
             # If order_id already exists, that means there are multiple tracking for the same order
@@ -212,7 +236,7 @@ class AmazonEasyInvoice(object):
                                                              f"<b><u>ORDERED ITEMS:</b></u> <br /> {items_as_html}",
                     ).encode('utf-8')
                     f.write(page_content_encoded)
-
+        print("You can find your invoices in Downloads folder in the project folder.")
         self.browser.quit()
 
 

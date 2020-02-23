@@ -109,13 +109,14 @@ class AmazonEasyInvoice(object):
         except TimeoutException:
             pass
 
-    def get_ordered_item_names(self):
+    def get_ordered_item_names_with_prices(self):
         """
 
         :return: item_names: all items which are belong to same progress tracker
         """
         length_of_items = len(self.browser.find_elements_by_xpath("//a[contains(@href, 'gp/product')]"))
-        item_names = []
+
+        ordered_items = []
         for i in range(length_of_items):
             item_url = self.browser.find_elements_by_xpath("//a[contains(@href, 'gp/product')]")[i]
             item_url.click()
@@ -125,11 +126,28 @@ class AmazonEasyInvoice(object):
             except TimeoutException:
                 raise Exception(f"Product page could not be loaded.")
 
-            item_names.append(self.browser.title)
+            item_name = (self.browser.find_elements_by_xpath("//div[@id='imgTagWrapperId']/img")[0].get_attribute('alt'))
+            try:
+                item_price = self.browser.find_elements_by_xpath('.//span[@id="priceblock_saleprice"]')[0].text
+            except Exception:
+                item_price = ""
+
+            if not item_price:
+                try:
+                    item_price = self.browser.find_elements_by_xpath('.//span[@id="priceblock_ourprice"]')[0].text
+                except Exception:
+                    item_price = "Price was not found."
+
+            ordered_items.append(
+                dict(
+                    item_name=item_name,
+                    item_price=item_price
+                )
+            )
             self.browser.back()
             self.wait_progress_tracker_page_to_be_loaded()
 
-        return item_names
+        return ordered_items
 
     def get_all_orders_with_tracking_info(self, amount_of_invoices):
         """
@@ -184,7 +202,7 @@ class AmazonEasyInvoice(object):
             tracked_item = {
                 "tracking_id": self.get_tracking_id(),
                 "delivery_by": self.get_delivery_company(),
-                "item_names": self.get_ordered_item_names(),
+                "ordered_items": self.get_ordered_item_names_with_prices(),
             }
 
             # If order_id already exists, that means there are multiple tracking for the same order
@@ -208,39 +226,58 @@ class AmazonEasyInvoice(object):
         orders_with_tracking_info = self.get_all_orders_with_tracking_info(amount_of_invoices)
 
         here = os.path.dirname(os.path.abspath(__file__))
-        download_folder = f'{here}/Downloads'
+        download_folder = f"{here}/Downloads"
 
         if not os.path.exists(download_folder):
-            os.mkdir(f'{here}/Downloads')
+            os.mkdir(f"{here}/Downloads")
 
         for i in range(len(orders_with_tracking_info)):
             order_id = list(orders_with_tracking_info[i].keys())[0]
+            html_file = f"{here}/Downloads/invoice_{order_id}.html"
+            self.browser.get(config.AMAZON_ORDER_INVOICE_URL + order_id)
+            page_content = self.browser.page_source
+            page_content_encoded = None
 
-            for order in orders_with_tracking_info[i][order_id]:
-                tracking_id = order["tracking_id"]
-                delivery_by = order["delivery_by"]
-                items = order["item_names"]
-                order_number = orders_with_tracking_info[i][order_id].index(order) + 1
-                html_file = f'{here}/Downloads/invoice_{order_id}_{order_number}.html'
+            with open(html_file, "wb") as f:
 
-                self.browser.get(config.AMAZON_ORDER_INVOICE_URL + order_id)
-                items_as_html = ', <br /> '.join(items)
+                for order in orders_with_tracking_info[i][order_id]:
+                    tracking_id = order["tracking_id"]
+                    delivery_by = order["delivery_by"]
+                    ordered_items = order["ordered_items"]
+                    order_items_string_with_name_and_price = []
+                    for ordered_item in ordered_items:
+                        ordered_item_string = ordered_item["item_name"] + " " + ordered_item["item_price"]
+                        order_items_string_with_name_and_price.append(ordered_item_string)
 
-                with open(html_file, 'wb') as f:
-                    page_content = self.browser.page_source
-                    page_content_encoded = page_content.replace(
-                        re.findall(
-                            f'{order_id}', page_content)[0], f"{order_id} <br /> "
-                                                             f"<b>Tracking ID</b>: {tracking_id} <br /> "
-                                                             f"<b>{delivery_by}</b> <br /> "
-                                                             f"<b><u>ORDERED ITEMS:</b></u> <br /> {items_as_html}",
-                    ).encode('utf-8')
-                    f.write(page_content_encoded)
+                    items_as_html = ", <br /> ".join(order_items_string_with_name_and_price)
+
+                    if page_content_encoded and "FULL INVOICE IS BELOW" in page_content_encoded.decode("utf-8"):
+                        page_content_encoded = page_content_encoded.decode('utf-8').replace(
+                            re.findall("FULL INVOICE IS BELOW", page_content_encoded.decode("utf-8"))[0],
+                            f"{order_id} <br /> "
+                            f"<b>Tracking ID</b>: {tracking_id} <br /> "
+                            f"<b>{delivery_by}</b> <br /> "
+                            f"<b><u>ORDERED ITEMS:</b></u> <br /> {items_as_html}<br /><br >"
+                            f"FULL INVOICE IS BELOW",
+                        ).encode("utf-8")
+                        continue
+
+                    page_content_encoded = re.sub(
+                        r"(?<=[\w\s\n\r\^])" + order_id + r"(?=[\w\s\n\r$])",
+                        f"{order_id} <br /> "
+                        f"<b>Tracking ID</b>: {tracking_id} <br /> "
+                        f"<b>{delivery_by}</b> <br /> "
+                        f"<b><u>ORDERED ITEMS:</b></u> <br /> "
+                        f"{items_as_html} <br /><br />"
+                        f"FULL INVOICE IS BELOW",
+                        page_content
+                    ).encode("utf-8")
+                f.write(page_content_encoded)
         print("You can find your invoices in Downloads folder in the project folder.")
         self.browser.quit()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--invoices_amount", type=int, default=0, help="Amount of invoices to download.")
     args = parser.parse_args()
